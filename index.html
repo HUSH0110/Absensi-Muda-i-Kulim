@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Absensi & Rekap Kehadiran - Muda/i KLP Kulim</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script defer src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
       --primary: #1b6b50;
@@ -29,7 +29,7 @@
       padding: 13px 16px;
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 60;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -240,7 +240,6 @@
     .note-input { margin-top: 8px; display: none; }
     .note-input.show { display: block; }
 
-    /* Filter Multi-Kegiatan di Rekap */
     .keg-filter-box {
       background: #f8fafc;
       border: 1px solid var(--border);
@@ -347,12 +346,26 @@
       padding: 4px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;
     }
 
-    #loader, .modal-backdrop {
+    #loader {
+      position: fixed;
+      inset: 58px 0 0 0;
+      background: rgba(243,245,244,0.96);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      z-index: 40;
+      padding: 20px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .modal-backdrop {
       position: fixed; inset: 0; background: rgba(17,24,39,0.72);
       display: flex; align-items: center; justify-content: center;
-      z-index: 50; padding: 16px;
+      z-index: 70; padding: 16px;
     }
-    #loader { background: rgba(255,255,255,0.92); font-weight: 700; color: var(--primary); }
     .modal-box {
       background: #fff; border-radius: 12px; padding: 18px;
       width: 100%; max-width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
@@ -365,7 +378,21 @@
 </head>
 <body>
 
-  <div id="loader">Memuat data kehadiran...</div>
+  <header>
+    <div>
+      <h1>Absensi Muda/i KLP Kulim</h1>
+      <p id="roleSubtitle">Mode Pengunjung • Rekap Kehadiran</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn-hdr" id="btnUrlCfg" style="display:none;" onclick="bukaModalUrl()">⚙ URL</button>
+      <button type="button" class="btn-hdr" id="btnLoginOpen" onclick="bukaModalLogin()">🔑 Login Admin</button>
+      <button type="button" class="btn-hdr logout" id="btnLogout" style="display:none;" onclick="logoutAdmin()">🚪 Keluar</button>
+    </div>
+  </header>
+
+  <div id="loader">
+    <div id="loaderText">Memuat data kehadiran...</div>
+  </div>
 
   <!-- Modal Login Admin -->
   <div id="modalLogin" class="modal-backdrop" style="display:none;">
@@ -394,7 +421,7 @@
     </div>
   </div>
 
-  <!-- Modal Pengaturan URL Apps Script (Khusus Admin) -->
+  <!-- Modal Pengaturan URL Apps Script -->
   <div id="modalUrl" class="modal-backdrop" style="display:none;">
     <div class="modal-box">
       <h3 style="font-size:16px;margin-bottom:6px;">URL Server Google Apps Script</h3>
@@ -410,24 +437,10 @@
     </div>
   </div>
 
-  <header>
-    <div>
-      <h1>Absensi Muda/i KLP Kulim</h1>
-      <p id="roleSubtitle">Mode Pengunjung • Rekap Kehadiran</p>
-    </div>
-    <div class="header-actions">
-      <button type="button" class="btn-hdr" id="btnUrlCfg" style="display:none;" onclick="bukaModalUrl()">⚙ URL</button>
-      <button type="button" class="btn-hdr" id="btnLoginOpen" onclick="bukaModalLogin()">🔑 Login Admin</button>
-      <button type="button" class="btn-hdr logout" id="btnLogout" style="display:none;" onclick="logoutAdmin()">🚪 Keluar</button>
-    </div>
-  </header>
-
-  <!-- Banner Informasi untuk Visitor -->
   <div id="visitorBanner" class="visitor-banner">
     Tampilan Pengunjung (Hanya Lihat Rekap Kehadiran)
   </div>
 
-  <!-- Navigasi Tab (Hanya Muncul Saat Login Sebagai Admin) -->
   <div class="tabs" id="adminTabs">
     <button class="tab-btn active" id="tabBtn-input" onclick="switchTab('input', this)">Input Absensi</button>
     <button class="tab-btn" id="tabBtn-kartu" onclick="switchTab('kartu', this)">Kartu QR</button>
@@ -527,3 +540,978 @@
         <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">
           Unduh gambar QR tiap anggota untuk dibagikan ke HP masing-masing atau dicetak sebagai kartu absensi <b>Pengajian Muda/i Kelompok</b>.
         </p>
+        <input type="text" id="searchQr" placeholder="Cari nama anggota untuk melihat QR..." oninput="renderQrCards()">
+      </div>
+      <div id="gridQrCards" class="qr-grid"></div>
+    </div>
+
+    <!-- TAB 3: REKAP KEHADIRAN (TERBUKA UNTUK VISITOR & ADMIN) -->
+    <div id="tab-rekap" class="section active">
+      <div class="card">
+        <div class="form-row">
+          <div>
+            <label>Filter Jenjang</label>
+            <select id="filterJenjangRekap" onchange="renderRekap()">
+              <option value="SEMUA">Semua Jenjang</option>
+              <option value="Muda/i">Muda/i</option>
+              <option value="Pra-Remaja">Pra-Remaja</option>
+            </select>
+          </div>
+          <div>
+            <label>Cari Nama</label>
+            <input type="text" id="searchRekap" placeholder="Ketik nama untuk melihat persentase..." oninput="renderRekap()">
+          </div>
+        </div>
+
+        <div class="keg-filter-box">
+          <label>Hitung Rekap & Persentase Berdasarkan Kegiatan:</label>
+          <div class="quick-actions" style="margin-top:4px; margin-bottom:6px;">
+            <button type="button" class="btn-sm green" onclick="pilihPresetKegiatan('SEMUA')">Semua (Akumulasi)</button>
+            <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('KELOMPOK')">Kelompok Saja</button>
+            <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('DESA')">Desa Saja</button>
+            <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('DAERAH')">Daerah Saja</button>
+          </div>
+          <div class="keg-checks" id="kegCheckContainer">
+            <label class="keg-pill-check checked">
+              <input type="checkbox" value="Pengajian Muda/i Kelompok" checked onchange="onFilterKegiatanChange()">
+              Pengajian Muda/i Kelompok
+            </label>
+            <label class="keg-pill-check checked">
+              <input type="checkbox" value="Pengajian Muda/i Desa" checked onchange="onFilterKegiatanChange()">
+              Pengajian Muda/i Desa
+            </label>
+            <label class="keg-pill-check checked">
+              <input type="checkbox" value="Pengajian Daerah" checked onchange="onFilterKegiatanChange()">
+              Pengajian Muda/i Daerah
+            </label>
+            <label class="keg-pill-check checked">
+              <input type="checkbox" value="__LAINNYA__" checked onchange="onFilterKegiatanChange()">
+              Kegiatan Lainnya
+            </label>
+          </div>
+          <div class="rekap-mode-info" id="rekapModeInfo">Menampilkan: Akumulasi Semua Pengajian</div>
+        </div>
+      </div>
+
+      <div class="card" style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama & Rincian per Pengajian</th>
+              <th class="num">H</th>
+              <th class="num">I</th>
+              <th class="num">A</th>
+              <th class="num">%</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyRekap"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: RIWAYAT LOG (KHUSUS ADMIN) -->
+    <div id="tab-riwayat" class="section">
+      <div class="card">
+        <label style="margin-bottom:8px;">30 Catatan Absensi Terakhir</label>
+        <div id="listRiwayat"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-bar" id="bottomBar">
+    <button class="btn-save" id="btnSimpan" onclick="kirimAbsensiManual()" disabled>Simpan Absensi (0 Orang)</button>
+  </div>
+
+  <script>
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwuMYz5gpa_uqxBv2vALvuYohLkVnXoGRpuajxO36x54UsuouQKrdWUouOTWOv1ZDQh/exec';
+
+    let gasUrl = localStorage.getItem('kulim_gas_url') || DEFAULT_GAS_URL;
+    let adminSession = null;
+    try {
+      const saved = localStorage.getItem('kulim_admin_session');
+      if (saved) adminSession = JSON.parse(saved);
+    } catch (e) {}
+
+    let masterAnggota = [];
+    let allLogs = [];
+    let recentLogs = [];
+    let draftStatus = {};
+
+    let html5QrScanner = null;
+    let availableCameras = [];
+    let isScanning = false;
+    let lastScanKey = '';
+    let lastScanTime = 0;
+
+    let syncQueue = [];
+    let isSyncing = false;
+
+    document.getElementById('inpTanggal').valueAsDate = new Date();
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        return response;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function setLoaderState(htmlMsg, show = true) {
+      const loader = document.getElementById('loader');
+      document.getElementById('loaderText').innerHTML = htmlMsg;
+      loader.style.display = show ? 'flex' : 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+      terapkanModeAkses();
+      await loadDataFromGas();
+
+      if (adminSession) {
+        try {
+          const res = await fetchWithTimeout(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'login',
+              auth: { username: adminSession.username, password: adminSession.password }
+            })
+          }, 12000);
+          const json = await res.json();
+          if (!json.ok) {
+            adminSession = null;
+            localStorage.removeItem('kulim_admin_session');
+            terapkanModeAkses();
+          }
+        } catch (e) {}
+      }
+    });
+
+    function terapkanModeAkses() {
+      const isAdmin = Boolean(adminSession);
+
+      document.body.classList.toggle('admin-mode', isAdmin);
+      document.getElementById('adminTabs').classList.toggle('show', isAdmin);
+      document.getElementById('visitorBanner').style.display = isAdmin ? 'none' : 'block';
+      document.getElementById('btnLoginOpen').style.display = isAdmin ? 'none' : 'inline-block';
+      document.getElementById('btnLogout').style.display = isAdmin ? 'inline-block' : 'none';
+      document.getElementById('btnUrlCfg').style.display = isAdmin ? 'inline-block' : 'none';
+
+      if (isAdmin) {
+        document.getElementById('roleSubtitle').textContent = `Admin: ${adminSession.nama} • Akses Penuh`;
+        switchTab('input', document.getElementById('tabBtn-input'));
+      } else {
+        if (isScanning) stopLiveScanner();
+        document.getElementById('roleSubtitle').textContent = 'Mode Pengunjung • Rekap Kehadiran';
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById('tab-rekap').classList.add('active');
+        document.getElementById('bottomBar').classList.remove('show');
+      }
+    }
+
+    function bukaModalLogin() {
+      document.getElementById('loginErrorMsg').style.display = 'none';
+      document.getElementById('inpAdminUser').value = '';
+      document.getElementById('inpAdminPass').value = '';
+      document.getElementById('modalLogin').style.display = 'flex';
+      setTimeout(() => document.getElementById('inpAdminUser').focus(), 80);
+    }
+
+    function tutupModalLogin() {
+      document.getElementById('modalLogin').style.display = 'none';
+    }
+
+    async function prosesLoginAdmin() {
+      const username = document.getElementById('inpAdminUser').value.trim();
+      const password = document.getElementById('inpAdminPass').value.trim();
+      const errBox = document.getElementById('loginErrorMsg');
+      const btn = document.getElementById('btnSubmitLogin');
+
+      if (!username || !password) {
+        errBox.textContent = 'Isi username dan password terlebih dahulu.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Memeriksa...';
+      errBox.style.display = 'none';
+
+      try {
+        const res = await fetchWithTimeout(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'login',
+            auth: { username, password }
+          })
+        }, 15000);
+        const json = await res.json();
+        if (!json.ok) {
+          errBox.textContent = json.error || 'Login gagal.';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        adminSession = {
+          username: json.admin.username,
+          nama: json.admin.nama,
+          password: password
+        };
+        localStorage.setItem('kulim_admin_session', JSON.stringify(adminSession));
+        tutupModalLogin();
+        terapkanModeAkses();
+      } catch (err) {
+        errBox.textContent = err.name === 'AbortError'
+          ? 'Koneksi ke Google Apps Script habis waktu (timeout). Periksa jaringan atau VPN.'
+          : 'Gagal terhubung ke server: ' + err.message;
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Masuk Admin';
+      }
+    }
+
+    function logoutAdmin() {
+      if (!confirm('Keluar dari mode Admin kembali ke tampilan Pengunjung?')) return;
+      adminSession = null;
+      localStorage.removeItem('kulim_admin_session');
+      terapkanModeAkses();
+    }
+
+    function bukaModalUrl() {
+      if (!adminSession) return;
+      document.getElementById('inpGasUrl').value = gasUrl || '';
+      document.getElementById('modalUrl').style.display = 'flex';
+    }
+
+    function tutupModalUrl() {
+      document.getElementById('modalUrl').style.display = 'none';
+    }
+
+    function simpanGasUrl() {
+      const val = document.getElementById('inpGasUrl').value.trim();
+      if (!val.startsWith('https://script.google.com/')) {
+        alert('Masukkan URL Google Apps Script yang valid.');
+        return;
+      }
+      gasUrl = val;
+      localStorage.setItem('kulim_gas_url', gasUrl);
+      tutupModalUrl();
+      loadDataFromGas();
+    }
+
+    async function loadDataFromGas() {
+      setLoaderState('Memuat data kehadiran...', true);
+      try {
+        const res = await fetchWithTimeout(`${gasUrl}?action=getData`, {}, 15000);
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error('Server mengembalikan HTML, bukan JSON. Pastikan di Apps Script "Yang memiliki akses" diatur ke "Siapa saja (Anyone)".');
+        }
+        if (!json.ok) throw new Error(json.error || 'Gagal memuat data.');
+        onDataLoaded(json.data);
+      } catch (err) {
+        const reason = err.name === 'AbortError'
+          ? 'Waktu koneksi habis (15 detik). Periksa koneksi internet atau matikan VPN sementara.'
+          : err.message;
+        setLoaderState(`
+          <div style="color:#dc2626;max-width:420px;line-height:1.5;">
+            Gagal memuat data kehadiran:<br>
+            <span style="font-weight:500;font-size:13px;color:#374151;">${reason}</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button type="button" class="btn-cam live" onclick="loadDataFromGas()">↻ Coba Lagi</button>
+            <button type="button" class="btn-sm" onclick="resetUrlDefault()">Reset URL Default</button>
+          </div>
+        `, true);
+      }
+    }
+
+    function resetUrlDefault() {
+      localStorage.removeItem('kulim_gas_url');
+      gasUrl = DEFAULT_GAS_URL;
+      loadDataFromGas();
+    }
+
+    function onDataLoaded(data) {
+      masterAnggota = data.anggota || [];
+      allLogs = data.allLogs || [];
+      recentLogs = data.logs || [];
+      setLoaderState('', false);
+      onKegiatanChange();
+      renderInputList();
+      renderRekap();
+      renderRiwayat();
+      updateSaveButton();
+    }
+
+    function switchTab(tabName, btn) {
+      if (!adminSession && tabName !== 'rekap') return;
+      if (tabName !== 'input' && isScanning) {
+        stopLiveScanner();
+      }
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('tab-' + tabName).classList.add('active');
+
+      const showBottom = Boolean(adminSession) && (tabName === 'input');
+      document.getElementById('bottomBar').classList.toggle('show', showBottom);
+
+      if (tabName === 'kartu') renderQrCards();
+      if (tabName === 'rekap') renderRekap();
+    }
+
+    function onKegiatanChange() {
+      const val = document.getElementById('selKegiatan').value;
+      document.getElementById('wrapKegiatanLain').style.display = (val === 'LAINNYA') ? 'block' : 'none';
+
+      const useBarcode = (val === 'Pengajian Muda/i Kelompok');
+      const banner = document.getElementById('modeBanner');
+      const scannerBox = document.getElementById('scannerContainer');
+
+      if (useBarcode) {
+        banner.className = 'mode-banner barcode';
+        banner.firstElementChild.textContent = 'Mode: Live Barcode / QR Code (+ Manual Cadangan)';
+        scannerBox.style.display = 'block';
+      } else {
+        if (isScanning) stopLiveScanner();
+        banner.className = 'mode-banner manual';
+        banner.firstElementChild.textContent = 'Mode: Input Manual Tanpa Barcode';
+        scannerBox.style.display = 'none';
+      }
+      updateScanCounter();
+    }
+
+    function playBeep(success = true) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(success ? 920 : 300, ctx.currentTime);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + (success ? 0.13 : 0.25));
+      } catch (e) {}
+    }
+
+    async function startLiveScanner(selectedCamId = null) {
+      if (!adminSession) return;
+      if (typeof Html5Qrcode === 'undefined') {
+        showFeedback('err', 'Pustaka kamera masih dimuat, coba klik beberapa detik lagi.');
+        return;
+      }
+      const readerEl = document.getElementById('qr-reader');
+      readerEl.style.display = 'block';
+      document.getElementById('btnStartCam').style.display = 'none';
+      document.getElementById('btnStopCam').style.display = 'inline-block';
+
+      try {
+        if (!html5QrScanner) {
+          html5QrScanner = new Html5Qrcode('qr-reader');
+        }
+        if (isScanning) {
+          await html5QrScanner.stop();
+          isScanning = false;
+        }
+
+        if (availableCameras.length === 0) {
+          availableCameras = await Html5Qrcode.getCameras();
+          const sel = document.getElementById('selCamera');
+          if (availableCameras && availableCameras.length > 0) {
+            sel.innerHTML = availableCameras.map((c, i) =>
+              `<option value="${c.id}">${c.label || 'Kamera ' + (i + 1)}</option>`
+            ).join('');
+            document.getElementById('camSelectRow').style.display =
+              availableCameras.length > 1 ? 'block' : 'none';
+          }
+        }
+
+        let cameraConfig = { facingMode: 'environment' };
+        if (selectedCamId) {
+          cameraConfig = selectedCamId;
+        } else if (availableCameras.length > 0) {
+          const backCam = availableCameras.find(d => /back|rear|environment/i.test(d.label));
+          const chosen = backCam || availableCameras[0];
+          cameraConfig = chosen.id;
+          document.getElementById('selCamera').value = chosen.id;
+        }
+
+        await html5QrScanner.start(
+          cameraConfig,
+          { fps: 12, qrbox: { width: 230, height: 230 } },
+          (decodedText) => handleQrResult(decodedText, false),
+          () => {}
+        );
+
+        isScanning = true;
+        showFeedback('ok', 'Kamera Aktif Terus-Menerus • Silakan scan QR anggota');
+      } catch (err) {
+        readerEl.style.display = 'none';
+        document.getElementById('btnStartCam').style.display = 'inline-block';
+        document.getElementById('btnStopCam').style.display = 'none';
+        const msg = (err && err.message) ? err.message : String(err);
+        showFeedback('err', `Gagal membuka kamera: ${msg}.`);
+      }
+    }
+
+    function gantiKamera() {
+      const camId = document.getElementById('selCamera').value;
+      if (camId) startLiveScanner(camId);
+    }
+
+    async function stopLiveScanner() {
+      if (html5QrScanner && isScanning) {
+        try { await html5QrScanner.stop(); } catch (e) {}
+      }
+      isScanning = false;
+      document.getElementById('qr-reader').style.display = 'none';
+      document.getElementById('camSelectRow').style.display = 'none';
+      document.getElementById('btnStartCam').style.display = 'inline-block';
+      document.getElementById('btnStopCam').style.display = 'none';
+    }
+
+    function prosesKodeInput() {
+      const inp = document.getElementById('inpKodeCepat');
+      const val = inp.value.trim();
+      if (!val) return;
+      handleQrResult(val, true);
+      inp.value = '';
+    }
+
+    function handleQrResult(rawText, skipDebounce = false) {
+      if (!adminSession) return;
+      const clean = String(rawText || '').trim().toUpperCase();
+      const now = Date.now();
+      if (!skipDebounce && clean === lastScanKey && (now - lastScanTime) < 2500) return;
+      lastScanKey = clean;
+      lastScanTime = now;
+
+      const match = clean.match(/^(?:KULIM-)?(\d+)$/);
+      if (!match) {
+        playBeep(false);
+        showFeedback('err', `QR tidak dikenali: "${rawText}"`);
+        return;
+      }
+
+      const targetId = Number(match[1]);
+      const member = masterAnggota.find(m => Number(m.id) === targetId);
+      if (!member) {
+        playBeep(false);
+        showFeedback('err', `ID Anggota #${targetId} tidak ditemukan.`);
+        return;
+      }
+
+      const alreadyHadir = draftStatus[member.id] && draftStatus[member.id].status === 'Hadir';
+      const autoSync = document.getElementById('chkAutoSync').checked;
+
+      draftStatus[member.id] = {
+        status: 'Hadir',
+        keterangan: (draftStatus[member.id] && draftStatus[member.id].keterangan) || '',
+        viaQr: true,
+        synced: alreadyHadir ? draftStatus[member.id].synced : false
+      };
+
+      playBeep(true);
+      if (navigator.vibrate) navigator.vibrate(120);
+
+      if (alreadyHadir) {
+        showFeedback('warn', `Sudah Hadir: ${member.id}. ${member.nama}`);
+      } else {
+        showFeedback('ok', `✓ HADIR: ${member.id}. ${member.nama}`);
+        if (autoSync) {
+          antrekanAutoSync(member.id, member.nama, 'Hadir', '');
+        }
+      }
+
+      renderInputList();
+      updateSaveButton();
+      updateScanCounter();
+    }
+
+    function antrekanAutoSync(id, nama, status, keterangan) {
+      const tanggal = document.getElementById('inpTanggal').value;
+      const kegiatan = getSelectedKegiatan();
+      syncQueue.push({ tanggal, kegiatan, record: { id, nama, status, keterangan } });
+      prosesAntreanSync();
+    }
+
+    async function prosesAntreanSync() {
+      if (isSyncing || syncQueue.length === 0 || !gasUrl || !adminSession) return;
+      isSyncing = true;
+      const statusEl = document.getElementById('syncStatusText');
+      statusEl.textContent = `Menyimpan ${syncQueue.length} data ke Spreadsheet...`;
+
+      const first = syncQueue[0];
+      const batch = [];
+      const remaining = [];
+      syncQueue.forEach(item => {
+        if (item.tanggal === first.tanggal && item.kegiatan === first.kegiatan) {
+          batch.push(item.record);
+        } else {
+          remaining.push(item);
+        }
+      });
+      syncQueue = remaining;
+
+      try {
+        const res = await fetchWithTimeout(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'simpanAbsensi',
+            auth: { username: adminSession.username, password: adminSession.password },
+            payload: { tanggal: first.tanggal, kegiatan: first.kegiatan, records: batch }
+          })
+        }, 15000);
+        const json = await res.json();
+        if (json.ok) {
+          batch.forEach(r => {
+            if (draftStatus[r.id]) draftStatus[r.id].synced = true;
+          });
+          masterAnggota = json.data.anggota || masterAnggota;
+          allLogs = json.data.allLogs || allLogs;
+          recentLogs = json.data.logs || recentLogs;
+          renderInputList();
+          renderRekap();
+          renderRiwayat();
+          updateSaveButton();
+          statusEl.textContent = `✓ Tersinkron otomatis ke Spreadsheet (${new Date().toLocaleTimeString('id-ID')})`;
+        } else {
+          statusEl.textContent = `Gagal auto-sync: ${json.error}`;
+        }
+      } catch (e) {
+        statusEl.textContent = `Koneksi lambat, tekan tombol Simpan di bawah untuk sinkron manual.`;
+      } finally {
+        isSyncing = false;
+        if (syncQueue.length > 0) prosesAntreanSync();
+      }
+    }
+
+    function showFeedback(type, msg) {
+      const el = document.getElementById('scanFeedback');
+      el.className = 'scan-feedback ' + type;
+      el.textContent = msg;
+    }
+
+    function updateScanCounter() {
+      const scannedCount = Object.values(draftStatus).filter(x => x.viaQr && x.status === 'Hadir').length;
+      const badge = document.getElementById('scanCounterBadge');
+      const useBarcode = (document.getElementById('selKegiatan').value === 'Pengajian Muda/i Kelompok');
+      badge.style.display = useBarcode ? 'inline' : 'none';
+      badge.textContent = `Terscan QR: ${scannedCount}`;
+    }
+
+    function getSelectedKegiatan() {
+      let kegiatan = document.getElementById('selKegiatan').value;
+      if (kegiatan === 'LAINNYA') {
+        kegiatan = document.getElementById('inpKegiatanLain').value.trim();
+      }
+      return kegiatan;
+    }
+
+    function getFilteredInputAnggota() {
+      const jenjang = document.getElementById('filterJenjangInput').value;
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      return masterAnggota.filter(a => {
+        const matchJenjang = (jenjang === 'SEMUA') || (a.jenjang === jenjang);
+        const matchNama = !q || a.nama.toLowerCase().includes(q);
+        return matchJenjang && matchNama;
+      });
+    }
+
+    function renderInputList() {
+      const list = getFilteredInputAnggota();
+      const container = document.getElementById('listAnggotaInput');
+      if (list.length === 0) {
+        container.innerHTML = '<div class="card" style="text-align:center;color:#6b7280;">Tidak ada anggota yang cocok.</div>';
+        return;
+      }
+
+      container.innerHTML = list.map(a => {
+        const cur = draftStatus[a.id] || { status: '', keterangan: '', viaQr: false, synced: false };
+        const badgeCls = a.jenjang === 'Pra-Remaja' ? 'pra' : (a.jenjang === 'Caberawit' ? 'caberawit' : '');
+        const showNote = cur.status === 'Izin' || cur.status === 'Alpa' || cur.keterangan;
+        const qrTag = cur.viaQr ? '<span class="badge" style="background:#dcfce7;color:#166534;">QR Scan</span>' : '';
+        const syncTag = cur.synced ? '<span class="badge" style="background:#dbeafe;color:#1e40af;">Tersimpan ✓</span>' : '';
+
+        return `
+          <div class="member-card ${cur.viaQr ? 'scanned-highlight' : ''}">
+            <div class="member-top">
+              <div>
+                <div class="member-name">${a.id}. ${a.nama}</div>
+                <span class="badge ${badgeCls}">${a.jenjang || 'Generus'}</span>
+                <span class="badge" style="background:#f3f4f6;color:#374151;">${a.kategori || '-'}</span>
+                ${qrTag} ${syncTag}
+              </div>
+              <div style="font-size:11px;color:#6b7280;text-align:right;">
+                Akumulasi: <b>${a.hadir}</b> (${a.persen}%)
+              </div>
+            </div>
+            <div class="status-group">
+              <button type="button" class="st-btn ${cur.status === 'Hadir' ? 'active-Hadir' : ''}" onclick="setStatus(${a.id}, 'Hadir')">Hadir</button>
+              <button type="button" class="st-btn ${cur.status === 'Izin' ? 'active-Izin' : ''}" onclick="setStatus(${a.id}, 'Izin')">Izin</button>
+              <button type="button" class="st-btn ${cur.status === 'Alpa' ? 'active-Alpa' : ''}" onclick="setStatus(${a.id}, 'Alpa')">Alpa</button>
+            </div>
+            <div class="note-input ${showNote ? 'show' : ''}">
+              <input type="text" placeholder="Keterangan (opsional, misal: sakit / kerja shift)..."
+                value="${cur.keterangan || ''}"
+                oninput="setKeterangan(${a.id}, this.value)">
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setStatus(id, status) {
+      if (!adminSession) return;
+      if (!draftStatus[id]) draftStatus[id] = { status: '', keterangan: '', viaQr: false, synced: false };
+      draftStatus[id].status = (draftStatus[id].status === status) ? '' : status;
+      draftStatus[id].synced = false;
+      if (draftStatus[id].status !== 'Hadir') draftStatus[id].viaQr = false;
+
+      if (!draftStatus[id].status && !draftStatus[id].keterangan) {
+        delete draftStatus[id];
+      }
+      renderInputList();
+      updateSaveButton();
+      updateScanCounter();
+    }
+
+    function setKeterangan(id, text) {
+      if (!draftStatus[id]) draftStatus[id] = { status: '', keterangan: '', viaQr: false, synced: false };
+      draftStatus[id].keterangan = text;
+      draftStatus[id].synced = false;
+      updateSaveButton();
+    }
+
+    function tandaiSemuaHadir() {
+      if (!adminSession) return;
+      const visible = getFilteredInputAnggota();
+      visible.forEach(a => {
+        if (!draftStatus[a.id] || !draftStatus[a.id].status) {
+          draftStatus[a.id] = { status: 'Hadir', keterangan: '', viaQr: false, synced: false };
+        }
+      });
+      renderInputList();
+      updateSaveButton();
+    }
+
+    function resetPilihan() {
+      draftStatus = {};
+      document.getElementById('scanFeedback').className = 'scan-feedback';
+      document.getElementById('syncStatusText').textContent = '';
+      renderInputList();
+      updateSaveButton();
+      updateScanCounter();
+    }
+
+    function updateSaveButton() {
+      const unsyncedCount = Object.values(draftStatus).filter(x => x.status && !x.synced).length;
+      const totalCount = Object.values(draftStatus).filter(x => x.status).length;
+      const btn = document.getElementById('btnSimpan');
+      btn.disabled = totalCount === 0;
+      btn.textContent = unsyncedCount > 0
+        ? `Simpan Absensi (${unsyncedCount} Belum Tersimpan)`
+        : `Semua Tersimpan (${totalCount} Orang) • Simpan Ulang`;
+    }
+
+    async function kirimAbsensiManual() {
+      if (!adminSession) return;
+      const tanggal = document.getElementById('inpTanggal').value;
+      const kegiatan = getSelectedKegiatan();
+      if (!kegiatan) {
+        alert('Silakan ketik nama kegiatan terlebih dahulu.');
+        return;
+      }
+
+      const records = [];
+      masterAnggota.forEach(a => {
+        const entry = draftStatus[a.id];
+        if (entry && entry.status) {
+          records.push({
+            id: a.id,
+            nama: a.nama,
+            status: entry.status,
+            keterangan: entry.keterangan || ''
+          });
+        }
+      });
+
+      if (records.length === 0) return;
+
+      setLoaderState('Menyimpan absensi ke spreadsheet...', true);
+
+      try {
+        const res = await fetchWithTimeout(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'simpanAbsensi',
+            auth: { username: adminSession.username, password: adminSession.password },
+            payload: { tanggal, kegiatan, records }
+          })
+        }, 15000);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || 'Gagal menyimpan.');
+
+        records.forEach(r => {
+          if (draftStatus[r.id]) draftStatus[r.id].synced = true;
+        });
+        onDataLoaded(json.data);
+        alert(`Berhasil menyimpan ${records.length} data absensi (${kegiatan})!`);
+      } catch (err) {
+        setLoaderState('', false);
+        alert('Gagal menyimpan: ' + err.message);
+      }
+    }
+
+    function renderQrCards() {
+      if (!adminSession) return;
+      if (typeof QRCode === 'undefined') {
+        document.getElementById('gridQrCards').innerHTML = '<div class="card">Memuat generator QR...</div>';
+        return;
+      }
+      const q = document.getElementById('searchQr').value.toLowerCase().trim();
+      const filtered = masterAnggota.filter(a => !q || a.nama.toLowerCase().includes(q));
+      const grid = document.getElementById('gridQrCards');
+
+      grid.innerHTML = filtered.map(a => `
+        <div class="qr-card">
+          <div style="font-size:12.5px;font-weight:700;min-height:34px;">${a.id}. ${a.nama}</div>
+          <div class="qr-box" id="qrbox-${a.id}"></div>
+          <div class="qr-code-label">${a.qrCode}</div>
+          <button type="button" class="btn-dl-qr" onclick="downloadQr(${a.id}, '${a.nama.replace(/'/g, "\\'")}')">⬇ Simpan QR</button>
+        </div>
+      `).join('');
+
+      filtered.forEach(a => {
+        const box = document.getElementById(`qrbox-${a.id}`);
+        if (box) {
+          new QRCode(box, {
+            text: a.qrCode,
+            width: 110,
+            height: 110,
+            colorDark: '#111827',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        }
+      });
+    }
+
+    function downloadQr(id, nama) {
+      const box = document.getElementById(`qrbox-${id}`);
+      const canvas = box ? box.querySelector('canvas') : null;
+      if (!canvas) return;
+
+      const out = document.createElement('canvas');
+      out.width = 260;
+      out.height = 310;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(canvas, 40, 20, 180, 180);
+
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${id}. ${nama}`, 130, 232);
+
+      ctx.fillStyle = '#1b6b50';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`KULIM-${id} • KLP Kulim`, 130, 256);
+
+      const link = document.createElement('a');
+      link.download = `QR_${id}_${nama.replace(/\s+/g, '_')}.png`;
+      link.href = out.toDataURL('image/png');
+      link.click();
+    }
+
+    function pilihPresetKegiatan(mode) {
+      const checkboxes = document.querySelectorAll('#kegCheckContainer input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+        if (mode === 'SEMUA') cb.checked = true;
+        else if (mode === 'KELOMPOK') cb.checked = (cb.value === 'Pengajian Muda/i Kelompok');
+        else if (mode === 'DESA') cb.checked = (cb.value === 'Pengajian Muda/i Desa');
+        else if (mode === 'DAERAH') cb.checked = (cb.value === 'Pengajian Daerah');
+      });
+      onFilterKegiatanChange();
+    }
+
+    function onFilterKegiatanChange() {
+      const checkboxes = document.querySelectorAll('#kegCheckContainer input[type="checkbox"]');
+      const activeNames = [];
+      checkboxes.forEach(cb => {
+        const lbl = cb.closest('label');
+        if (cb.checked) {
+          lbl.classList.add('checked');
+          activeNames.push(cb.value === '__LAINNYA__' ? 'Kegiatan Lainnya' : cb.value);
+        } else {
+          lbl.classList.remove('checked');
+        }
+      });
+
+      const infoEl = document.getElementById('rekapModeInfo');
+      if (activeNames.length === checkboxes.length) {
+        infoEl.textContent = 'Menampilkan: Akumulasi Semua Pengajian';
+      } else if (activeNames.length === 0) {
+        infoEl.textContent = 'Menampilkan: Tidak ada kegiatan dipilih (0%)';
+      } else {
+        infoEl.textContent = 'Menampilkan: ' + activeNames.join(' + ');
+      }
+      renderRekap();
+    }
+
+    function normalizeKegiatanKey(rawKeg) {
+      const k = String(rawKeg || '').trim();
+      if (k === 'Pengajian Muda/i Kelompok') return 'Pengajian Muda/i Kelompok';
+      if (k === 'Pengajian Muda/i Desa') return 'Pengajian Muda/i Desa';
+      if (k === 'Pengajian Daerah' || k === 'Pengajian Muda/i Daerah') return 'Pengajian Daerah';
+      return '__LAINNYA__';
+    }
+
+    function hitungStatistikAnggota(memberId, selectedSet) {
+      const byKeg = {
+        'Pengajian Muda/i Kelompok': { h: 0, i: 0, a: 0 },
+        'Pengajian Muda/i Desa': { h: 0, i: 0, a: 0 },
+        'Pengajian Daerah': { h: 0, i: 0, a: 0 },
+        '__LAINNYA__': { h: 0, i: 0, a: 0 }
+      };
+
+      const idStr = String(memberId).trim();
+      allLogs.forEach(log => {
+        if (String(log.idAnggota).trim() !== idStr) return;
+        const key = normalizeKegiatanKey(log.kegiatan);
+        if (log.status === 'Hadir') byKeg[key].h++;
+        else if (log.status === 'Izin') byKeg[key].i++;
+        else if (log.status === 'Alpa') byKeg[key].a++;
+      });
+
+      let selH = 0, selI = 0, selA = 0;
+      selectedSet.forEach(key => {
+        if (byKeg[key]) {
+          selH += byKeg[key].h;
+          selI += byKeg[key].i;
+          selA += byKeg[key].a;
+        }
+      });
+
+      const calcPct = (obj) => {
+        const tot = obj.h + obj.i + obj.a;
+        return tot > 0 ? Math.round((obj.h / tot) * 100) : 0;
+      };
+
+      const totalSel = selH + selI + selA;
+      return {
+        hadir: selH,
+        izin: selI,
+        alpa: selA,
+        persen: totalSel > 0 ? Math.round((selH / totalSel) * 100) : 0,
+        pctKelompok: calcPct(byKeg['Pengajian Muda/i Kelompok']),
+        pctDesa: calcPct(byKeg['Pengajian Muda/i Desa']),
+        pctDaerah: calcPct(byKeg['Pengajian Daerah'])
+      };
+    }
+
+    function renderRekap() {
+      const jenjang = document.getElementById('filterJenjangRekap').value;
+      const q = document.getElementById('searchRekap').value.toLowerCase().trim();
+
+      const selectedSet = new Set();
+      document.querySelectorAll('#kegCheckContainer input[type="checkbox"]:checked').forEach(cb => {
+        selectedSet.add(cb.value);
+      });
+
+      const filtered = masterAnggota.filter(a => {
+        const matchJ = (jenjang === 'SEMUA') || (a.jenjang === jenjang);
+        const matchN = !q || a.nama.toLowerCase().includes(q);
+        return matchJ && matchN;
+      });
+
+      document.getElementById('tbodyRekap').innerHTML = filtered.map(a => {
+        const st = hitungStatistikAnggota(a.id, selectedSet);
+        const chipCls = (p) => p >= 75 ? 'hi' : (p > 0 ? 'mid' : '');
+
+        return `
+          <tr>
+            <td>${a.id}</td>
+            <td>
+              <b>${a.nama}</b>
+              <div style="font-size:11px;color:#6b7280;">${a.jenjang} • ${a.kategori}</div>
+              <div class="sub-pct-row">
+                <span class="pct-chip ${chipCls(st.pctKelompok)}">Kelompok: <b>${st.pctKelompok}%</b></span>
+                <span class="pct-chip ${chipCls(st.pctDesa)}">Desa: <b>${st.pctDesa}%</b></span>
+                <span class="pct-chip ${chipCls(st.pctDaerah)}">Daerah: <b>${st.pctDaerah}%</b></span>
+              </div>
+            </td>
+            <td class="num" style="color:#16a34a;font-weight:700;">${st.hadir}</td>
+            <td class="num" style="color:#d97706;font-weight:700;">${st.izin}</td>
+            <td class="num" style="color:#dc2626;font-weight:700;">${st.alpa}</td>
+            <td class="num"><b>${st.persen}%</b></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderRiwayat() {
+      if (!adminSession) return;
+      const container = document.getElementById('listRiwayat');
+      if (recentLogs.length === 0) {
+        container.innerHTML = '<p style="font-size:13px;color:#6b7280;">Belum ada riwayat absensi.</p>';
+        return;
+      }
+
+      container.innerHTML = recentLogs.map(log => `
+        <div class="log-item">
+          <div>
+            <div style="font-weight:700;font-size:13px;">${log.namaAnggota}</div>
+            <div style="font-size:11px;color:#6b7280;">
+              ${log.tanggal} (${log.waktu}) • ${log.kegiatan}
+              ${log.keterangan ? `<br><i>Catatan: ${log.keterangan}</i>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="pill ${log.status}">${log.status}</span>
+            <button type="button" class="btn-del" onclick="hapusLog('${log.idAbsensi}')">Hapus</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function hapusLog(idAbsensi) {
+      if (!adminSession) return;
+      if (!confirm('Hapus catatan absensi ini?')) return;
+      setLoaderState('Menghapus catatan...', true);
+
+      try {
+        const res = await fetchWithTimeout(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'hapusLog',
+            auth: { username: adminSession.username, password: adminSession.password },
+            idAbsensi: idAbsensi
+          })
+        }, 15000);
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.error || 'Gagal menghapus.');
+        onDataLoaded(json.data);
+      } catch (err) {
+        setLoaderState('', false);
+        alert('Gagal menghapus: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
