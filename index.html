@@ -99,10 +99,13 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    @media (max-width: 540px) {
+      .form-row, .form-row-3 { grid-template-columns: 1fr; }
+    }
 
     label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-    input[type="date"], input[type="text"], input[type="password"], input[type="url"], select {
+    input[type="date"], input[type="month"], input[type="text"], input[type="password"], input[type="url"], select {
       width: 100%;
       padding: 9px 10px;
       border: 1px solid #d1d5db;
@@ -239,6 +242,24 @@
 
     .note-input { margin-top: 8px; display: none; }
     .note-input.show { display: block; }
+
+    /* Ringkasan Jumlah Anggota & Persentase di Tab Rekap */
+    .rekap-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .sum-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .sum-box .sum-lbl { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .sum-box .sum-val { font-size: 17px; font-weight: 800; color: var(--primary); margin-top: 2px; }
+    .sum-box .sum-sub { font-size: 10.5px; color: #4b5563; margin-top: 2px; }
 
     .keg-filter-box {
       background: #f8fafc;
@@ -438,7 +459,7 @@
   </div>
 
   <div id="visitorBanner" class="visitor-banner">
-    Tampilan Pengunjung (Hanya Lihat Rekap Kehadiran)
+    Tampilan Pengunjung (Hanya Lihat Rekap Kehadiran per Bulan)
   </div>
 
   <div class="tabs" id="adminTabs">
@@ -513,7 +534,7 @@
           <div>
             <label>Filter Jenjang</label>
             <select id="filterJenjangInput" onchange="renderInputList()">
-              <option value="SEMUA">Semua Anggota (35)</option>
+              <option value="SEMUA">Semua Anggota</option>
               <option value="Muda/i">Muda/i Saja</option>
               <option value="Pra-Remaja">Pra-Remaja Saja</option>
             </select>
@@ -545,10 +566,14 @@
       <div id="gridQrCards" class="qr-grid"></div>
     </div>
 
-    <!-- TAB 3: REKAP KEHADIRAN (TERBUKA UNTUK VISITOR & ADMIN) -->
+    <!-- TAB 3: REKAP KEHADIRAN PER BULAN (TERBUKA UNTUK VISITOR & ADMIN) -->
     <div id="tab-rekap" class="section active">
       <div class="card">
-        <div class="form-row">
+        <div class="form-row-3">
+          <div>
+            <label>Periode Bulan</label>
+            <input type="month" id="filterBulanRekap" onchange="renderRekap()">
+          </div>
           <div>
             <label>Filter Jenjang</label>
             <select id="filterJenjangRekap" onchange="renderRekap()">
@@ -559,14 +584,14 @@
           </div>
           <div>
             <label>Cari Nama</label>
-            <input type="text" id="searchRekap" placeholder="Ketik nama untuk melihat persentase..." oninput="renderRekap()">
+            <input type="text" id="searchRekap" placeholder="Ketik nama..." oninput="renderRekap()">
           </div>
         </div>
 
         <div class="keg-filter-box">
-          <label>Hitung Rekap & Persentase Berdasarkan Kegiatan:</label>
+          <label>Hitung Persentase Bulan Ini Berdasarkan Kegiatan:</label>
           <div class="quick-actions" style="margin-top:4px; margin-bottom:6px;">
-            <button type="button" class="btn-sm green" onclick="pilihPresetKegiatan('SEMUA')">Semua (Akumulasi)</button>
+            <button type="button" class="btn-sm green" onclick="pilihPresetKegiatan('SEMUA')">Semua Kegiatan Bulan Ini</button>
             <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('KELOMPOK')">Kelompok Saja</button>
             <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('DESA')">Desa Saja</button>
             <button type="button" class="btn-sm" onclick="pilihPresetKegiatan('DAERAH')">Daerah Saja</button>
@@ -589,7 +614,26 @@
               Kegiatan Lainnya
             </label>
           </div>
-          <div class="rekap-mode-info" id="rekapModeInfo">Menampilkan: Akumulasi Semua Pengajian</div>
+          <div class="rekap-mode-info" id="rekapModeInfo">Menampilkan: Bulan Ini • Semua Pengajian</div>
+        </div>
+      </div>
+
+      <!-- Ringkasan Jumlah Anggota & Persentase Rata-Rata -->
+      <div class="rekap-summary-grid" id="rekapSummaryGrid">
+        <div class="sum-box">
+          <div class="sum-lbl">Jumlah Anggota</div>
+          <div class="sum-val" id="sumTotalOrang">0 Orang</div>
+          <div class="sum-sub" id="sumDetailJenjang">-</div>
+        </div>
+        <div class="sum-box">
+          <div class="sum-lbl">Rata-rata Hadir</div>
+          <div class="sum-val" id="sumAvgPersen">0%</div>
+          <div class="sum-sub" id="sumBulanLabel">-</div>
+        </div>
+        <div class="sum-box">
+          <div class="sum-lbl">Total Catatan</div>
+          <div class="sum-val" id="sumTotalH">0 Hadir</div>
+          <div class="sum-sub" id="sumTotalIA">Izin: 0 • Alpa: 0</div>
         </div>
       </div>
 
@@ -597,8 +641,8 @@
         <table>
           <thead>
             <tr>
-              <th>No</th>
-              <th>Nama & Rincian per Pengajian</th>
+              <th style="width:36px;">No</th>
+              <th>Nama & Rincian Bulan Ini</th>
               <th class="num">H</th>
               <th class="num">I</th>
               <th class="num">A</th>
@@ -624,7 +668,7 @@
   </div>
 
   <script>
-    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwuMYz5gpa_uqxBv2vALvuYohLkVnXoGRpuajxO36x54UsuouQKrdWUouOTWOv1ZDQh/exec';
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwuMYz5gpa_uqxBv2vALvuYohLkVnXoGRpuajxO36x54UsuouQKrdWUcuOTwOvIZDQh/exec';
 
     let gasUrl = localStorage.getItem('kulim_gas_url') || DEFAULT_GAS_URL;
     let adminSession = null;
@@ -647,14 +691,30 @@
     let syncQueue = [];
     let isSyncing = false;
 
+    function getCurrentMonthStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function formatNamaBulan(ym) {
+      const bulanNames = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      const parts = String(ym || '').split('-');
+      if (parts.length !== 2) return ym;
+      const idx = parseInt(parts[1], 10) - 1;
+      return `${bulanNames[idx] || parts[1]} ${parts[0]}`;
+    }
+
     document.getElementById('inpTanggal').valueAsDate = new Date();
+    document.getElementById('filterBulanRekap').value = getCurrentMonthStr();
 
     async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetch(url, { ...options, signal: controller.signal });
-        return response;
+        return await fetch(url, { ...options, signal: controller.signal });
       } finally {
         clearTimeout(timer);
       }
@@ -847,7 +907,7 @@
       setLoaderState('', false);
       onKegiatanChange();
       renderInputList();
-      renderRekap();
+      onFilterKegiatanChange();
       renderRiwayat();
       updateSaveButton();
     }
@@ -1138,7 +1198,7 @@
         return;
       }
 
-      container.innerHTML = list.map(a => {
+      container.innerHTML = list.map((a, idx) => {
         const cur = draftStatus[a.id] || { status: '', keterangan: '', viaQr: false, synced: false };
         const badgeCls = a.jenjang === 'Pra-Remaja' ? 'pra' : (a.jenjang === 'Caberawit' ? 'caberawit' : '');
         const showNote = cur.status === 'Izin' || cur.status === 'Alpa' || cur.keterangan;
@@ -1149,13 +1209,13 @@
           <div class="member-card ${cur.viaQr ? 'scanned-highlight' : ''}">
             <div class="member-top">
               <div>
-                <div class="member-name">${a.id}. ${a.nama}</div>
+                <div class="member-name">${idx + 1}. ${a.nama}</div>
                 <span class="badge ${badgeCls}">${a.jenjang || 'Generus'}</span>
-                <span class="badge" style="background:#f3f4f6;color:#374151;">${a.kategori || '-'}</span>
+                <span class="badge" style="background:#f3f4f6;color:#374151;">${a.kategori || '-'} • ID #${a.id}</span>
                 ${qrTag} ${syncTag}
               </div>
               <div style="font-size:11px;color:#6b7280;text-align:right;">
-                Akumulasi: <b>${a.hadir}</b> (${a.persen}%)
+                Bulan Ini: <b>${a.hadir}</b> (${a.persen}%)
               </div>
             </div>
             <div class="status-group">
@@ -1351,25 +1411,11 @@
 
     function onFilterKegiatanChange() {
       const checkboxes = document.querySelectorAll('#kegCheckContainer input[type="checkbox"]');
-      const activeNames = [];
       checkboxes.forEach(cb => {
         const lbl = cb.closest('label');
-        if (cb.checked) {
-          lbl.classList.add('checked');
-          activeNames.push(cb.value === '__LAINNYA__' ? 'Kegiatan Lainnya' : cb.value);
-        } else {
-          lbl.classList.remove('checked');
-        }
+        if (cb.checked) lbl.classList.add('checked');
+        else lbl.classList.remove('checked');
       });
-
-      const infoEl = document.getElementById('rekapModeInfo');
-      if (activeNames.length === checkboxes.length) {
-        infoEl.textContent = 'Menampilkan: Akumulasi Semua Pengajian';
-      } else if (activeNames.length === 0) {
-        infoEl.textContent = 'Menampilkan: Tidak ada kegiatan dipilih (0%)';
-      } else {
-        infoEl.textContent = 'Menampilkan: ' + activeNames.join(' + ');
-      }
       renderRekap();
     }
 
@@ -1381,7 +1427,7 @@
       return '__LAINNYA__';
     }
 
-    function hitungStatistikAnggota(memberId, selectedSet) {
+    function hitungStatistikBulananAnggota(memberId, selectedSet, selectedMonth) {
       const byKeg = {
         'Pengajian Muda/i Kelompok': { h: 0, i: 0, a: 0 },
         'Pengajian Muda/i Desa': { h: 0, i: 0, a: 0 },
@@ -1392,6 +1438,8 @@
       const idStr = String(memberId).trim();
       allLogs.forEach(log => {
         if (String(log.idAnggota).trim() !== idStr) return;
+        if (!String(log.tanggal || '').startsWith(selectedMonth)) return;
+
         const key = normalizeKegiatanKey(log.kegiatan);
         if (log.status === 'Hadir') byKeg[key].h++;
         else if (log.status === 'Izin') byKeg[key].i++;
@@ -1425,13 +1473,32 @@
     }
 
     function renderRekap() {
+      const bulanInp = document.getElementById('filterBulanRekap');
+      if (!bulanInp.value) bulanInp.value = getCurrentMonthStr();
+      const selectedMonth = bulanInp.value;
+      const namaBulan = formatNamaBulan(selectedMonth);
+
       const jenjang = document.getElementById('filterJenjangRekap').value;
       const q = document.getElementById('searchRekap').value.toLowerCase().trim();
 
       const selectedSet = new Set();
-      document.querySelectorAll('#kegCheckContainer input[type="checkbox"]:checked').forEach(cb => {
-        selectedSet.add(cb.value);
+      const activeNames = [];
+      const allCheckboxes = document.querySelectorAll('#kegCheckContainer input[type="checkbox"]');
+      allCheckboxes.forEach(cb => {
+        if (cb.checked) {
+          selectedSet.add(cb.value);
+          activeNames.push(cb.value === '__LAINNYA__' ? 'Kegiatan Lainnya' : cb.value);
+        }
       });
+
+      const infoEl = document.getElementById('rekapModeInfo');
+      if (activeNames.length === allCheckboxes.length) {
+        infoEl.textContent = `Periode: ${namaBulan} • Semua Pengajian`;
+      } else if (activeNames.length === 0) {
+        infoEl.textContent = `Periode: ${namaBulan} • Tidak ada kegiatan dipilih`;
+      } else {
+        infoEl.textContent = `Periode: ${namaBulan} • ${activeNames.join(' + ')}`;
+      }
 
       const filtered = masterAnggota.filter(a => {
         const matchJ = (jenjang === 'SEMUA') || (a.jenjang === jenjang);
@@ -1439,16 +1506,27 @@
         return matchJ && matchN;
       });
 
-      document.getElementById('tbodyRekap').innerHTML = filtered.map(a => {
-        const st = hitungStatistikAnggota(a.id, selectedSet);
+      let sumH = 0, sumI = 0, sumA = 0, sumPct = 0;
+      let countMuda = 0, countPra = 0;
+
+      const rowsHtml = filtered.map((a, index) => {
+        if (a.jenjang === 'Muda/i') countMuda++;
+        else if (a.jenjang === 'Pra-Remaja') countPra++;
+
+        const st = hitungStatistikBulananAnggota(a.id, selectedSet, selectedMonth);
+        sumH += st.hadir;
+        sumI += st.izin;
+        sumA += st.alpa;
+        sumPct += st.persen;
+
         const chipCls = (p) => p >= 75 ? 'hi' : (p > 0 ? 'mid' : '');
 
         return `
           <tr>
-            <td>${a.id}</td>
+            <td><b>${index + 1}</b></td>
             <td>
               <b>${a.nama}</b>
-              <div style="font-size:11px;color:#6b7280;">${a.jenjang} • ${a.kategori}</div>
+              <div style="font-size:11px;color:#6b7280;">ID #${a.id} • ${a.jenjang} • ${a.kategori}</div>
               <div class="sub-pct-row">
                 <span class="pct-chip ${chipCls(st.pctKelompok)}">Kelompok: <b>${st.pctKelompok}%</b></span>
                 <span class="pct-chip ${chipCls(st.pctDesa)}">Desa: <b>${st.pctDesa}%</b></span>
@@ -1462,6 +1540,25 @@
           </tr>
         `;
       }).join('');
+
+      document.getElementById('tbodyRekap').innerHTML = rowsHtml || `
+        <tr><td colspan="6" style="text-align:center;color:#6b7280;padding:16px;">Tidak ada data anggota yang sesuai filter.</td></tr>
+      `;
+
+      // Perbarui Kartu Ringkasan di atas tabel
+      document.getElementById('sumTotalOrang').textContent = `${filtered.length} Orang`;
+      if (jenjang === 'SEMUA') {
+        document.getElementById('sumDetailJenjang').textContent = `Muda/i: ${countMuda} • Pra-Remaja: ${countPra}`;
+      } else {
+        document.getElementById('sumDetailJenjang').textContent = `Jenjang: ${jenjang}`;
+      }
+
+      const avgPct = filtered.length > 0 ? Math.round(sumPct / filtered.length) : 0;
+      document.getElementById('sumAvgPersen').textContent = `${avgPct}%`;
+      document.getElementById('sumBulanLabel').textContent = namaBulan;
+
+      document.getElementById('sumTotalH').textContent = `${sumH} Hadir`;
+      document.getElementById('sumTotalIA').textContent = `Izin: ${sumI} • Alpa: ${sumA}`;
     }
 
     function renderRiwayat() {
